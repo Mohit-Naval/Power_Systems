@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transmission Line Sending-End Analyzer — Group 8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef0f3;
+    --panel:#ffffff;
+    --panel-2:#f5f6f8;
+    --line:#dde1e7;
+    --line-soft:#e8eaee;
+    --copper:#a15c1f;
+    --amber:#9c6b12;
+    --navy:#1c3d5f;
+    --navy-2:#254e78;
+    --text:#1b2430;
+    --muted:#5c6675;
+    --muted-2:#8892a0;
+    --good:#2f7a52;
+    --warn:#9c6b12;
+    --bad:#b23b2e;
+    --radius-panel: 10px;
+    --radius-chip: 4px;
+    --shadow: 0 1px 2px rgba(20,30,45,0.04), 0 4px 14px rgba(20,30,45,0.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  a{color:var(--navy-2);}
+
+  /* ---------- layout shell ---------- */
+  .wrap{max-width:1180px; margin:0 auto; padding:28px 20px 80px;}
+
+  .masthead{
+    display:flex; align-items:baseline; justify-content:space-between;
+    gap:16px; flex-wrap:wrap;
+    border-bottom:1px solid var(--line);
+    padding-bottom:18px; margin-bottom:22px;
+  }
+  .masthead h1{
+    font-size:22px; font-weight:600; margin:0 0 4px;
+    letter-spacing:0.1px;
+    color:var(--navy);
+  }
+  .masthead .sub{color:var(--muted); font-size:13.5px; max-width:560px;}
+  .masthead .tag{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--muted-2);
+    text-align:right;
+  }
+  .masthead .tag div{margin-bottom:2px;}
+  .masthead .tag b{color:var(--navy-2); font-weight:600;}
+
+  /* ---------- schematic hero ---------- */
+  .schematic-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius-panel);
+    padding:18px 20px 14px;
+    margin-bottom:22px;
+    position:relative;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  .schematic-card::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:26px 26px;
+    opacity:0.5;
+    pointer-events:none;
+  }
+  .schematic-top{display:flex; align-items:center; justify-content:space-between; position:relative; z-index:1; margin-bottom:6px; flex-wrap:wrap; gap:10px;}
+  .classification-badge{
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px;
+    padding:5px 11px; border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    color:var(--text);
+  }
+  .classification-badge .dot{width:7px; height:7px; border-radius:50%; background:var(--good);}
+  .schematic-note{color:var(--muted); font-size:12.5px; font-family:'IBM Plex Mono', monospace;}
+  svg.diagram{width:100%; height:150px; display:block; position:relative; z-index:1;}
+  .diagram text{fill:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:11px;}
+  .diagram .lbl-strong{fill:var(--navy); font-size:12.5px; font-weight:600; font-family:'IBM Plex Sans', sans-serif;}
+  .diagram .wire{stroke:var(--navy-2); stroke-width:2; fill:none;}
+  .diagram .wire-dim{stroke:var(--muted-2); stroke-width:1.4; fill:none; stroke-dasharray:3 4;}
+  .diagram .cap{stroke:var(--copper); stroke-width:2;}
+  .diagram .node{fill:var(--panel); stroke:var(--navy-2); stroke-width:2;}
+  .diagram .box{fill:rgba(28,61,95,0.05); stroke:var(--navy-2); stroke-width:1.4;}
+
+  /* ---------- main grid ---------- */
+  .grid{display:grid; grid-template-columns:340px 1fr; gap:22px;}
+  @media (max-width:880px){ .grid{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius-panel);
+    padding:18px 18px 20px;
+    box-shadow:var(--shadow);
+  }
+  .panel h2{
+    font-size:13px; font-weight:600; margin:0 0 4px;
+    color:var(--navy);
+  }
+  .panel .panel-sub{color:var(--muted); font-size:12px; margin-bottom:14px;}
+
+  /* member table */
+  .member-table{width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px;}
+  .member-table th{
+    text-align:left; font-weight:500; color:var(--muted-2);
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px;
+    padding:5px 6px; border-bottom:1px solid var(--line);
+  }
+  .member-table td{
+    padding:6px 6px; border-bottom:1px solid var(--line-soft);
+    font-family:'IBM Plex Mono', monospace; color:var(--muted);
+    cursor:pointer;
+  }
+  .member-table tr:hover td{color:var(--text); background:var(--panel-2);}
+  .member-table tr.active td{color:var(--navy-2); background:rgba(37,78,120,0.07); font-weight:600;}
+  .member-table tr:last-child td{border-bottom:none;}
+
+  .field{margin-bottom:12px;}
+  .field label{
+    display:block; font-size:11.5px; color:var(--muted); margin-bottom:5px;
+  }
+  .field .hint{color:var(--muted-2); font-size:10.5px; margin-top:3px;}
+  .field input, .field select{
+    width:100%; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--text); padding:8px 10px; border-radius:var(--radius-chip);
+    font-family:'IBM Plex Mono', monospace; font-size:13px;
+  }
+  .field input:focus, .field select:focus{outline:none; border-color:var(--navy-2);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .divider{height:1px; background:var(--line); margin:16px 0;}
+
+  .pf-toggle{display:flex; gap:8px;}
+  .pf-toggle button{
+    flex:1; padding:8px 0; border-radius:var(--radius-chip);
+    border:1px solid var(--line); background:var(--panel-2); color:var(--muted);
+    font-family:'IBM Plex Mono', monospace; font-size:12px; cursor:pointer;
+  }
+  .pf-toggle button.active{border-color:var(--navy-2); color:var(--navy-2); background:rgba(37,78,120,0.07);}
+
+  .calc-btn{
+    width:100%; margin-top:6px; padding:11px 0; border:none; border-radius:var(--radius-chip);
+    background:var(--navy); color:#ffffff; font-weight:600; font-size:13.5px;
+    cursor:pointer; letter-spacing:0.2px;
+  }
+  .calc-btn:hover{background:var(--navy-2);}
+
+  /* results */
+  .results-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;}
+  .abcd-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px;}
+  .abcd-cell{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:var(--radius-chip);
+    padding:10px 12px;
+  }
+  .abcd-cell .k{color:var(--muted-2); font-size:11px; margin-bottom:4px; font-family:'IBM Plex Mono', monospace;}
+  .abcd-cell .v{font-family:'IBM Plex Mono', monospace; font-size:13.5px; color:var(--text);}
+
+  .readout-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:18px;}
+  @media (max-width:640px){ .readout-grid{grid-template-columns:1fr 1fr;} }
+  .readout{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:var(--radius-chip);
+    padding:12px 14px;
+  }
+  .readout .lbl{color:var(--muted); font-size:11.5px; margin-bottom:6px;}
+  .readout .val{font-family:'IBM Plex Mono', monospace; font-size:19px; color:var(--text); font-weight:500;}
+  .readout .unit{font-size:12px; color:var(--muted-2); margin-left:4px;}
+  .readout.accent .val{color:var(--navy-2);}
+
+  .bar-row{margin-bottom:14px;}
+  .bar-row .bar-top{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:6px;}
+  .bar-row .bar-top .num{font-family:'IBM Plex Mono', monospace; color:var(--text); font-size:13px;}
+  .bar-track{height:7px; border-radius:4px; background:var(--panel-2); border:1px solid var(--line); overflow:hidden;}
+  .bar-fill{height:100%; border-radius:4px; background:linear-gradient(90deg, var(--navy), var(--navy-2));}
+
+  .empty-state{
+    color:var(--muted-2); font-size:13px; font-family:'IBM Plex Mono', monospace;
+    padding:40px 10px; text-align:center; border:1px dashed var(--line); border-radius:var(--radius-chip);
+  }
+
+  .formula-note{
+    margin-top:4px; color:var(--muted-2); font-size:11.5px; font-family:'IBM Plex Mono', monospace;
+    border-top:1px solid var(--line); padding-top:12px;
+  }
+
+  footer{
+    margin-top:28px; color:var(--muted-2); font-size:11.5px; text-align:center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>Transmission Line Sending-End Analyzer</h1>
+      <div class="sub">Classifies the line as short, medium or long and solves the ABCD model to get sending-end voltage, current, power, power factor, voltage regulation and efficiency.</div>
+    </div>
+    <div class="tag">
+      <div>Assignment 3 — Power Systems</div>
+      <div>Group <b id="tagGroup">8</b> · 50 Hz, 3-phase</div>
+    </div>
+  </div>
+
+  <div class="schematic-card">
+    <div class="schematic-top">
+      <div class="classification-badge"><span class="dot" id="badgeDot"></span><span id="badgeText">SHORT LINE · L &lt; 80 km</span></div>
+      <div class="schematic-note" id="schematicNote">shunt admittance neglected — series impedance only</div>
+    </div>
+    <svg class="diagram" viewBox="0 0 900 150" id="diagramSvg"></svg>
+  </div>
+
+  <div class="grid">
+
+    <!-- LEFT: inputs -->
+    <div class="panel">
+      <h2>Group 8 — member reference</h2>
+      <div class="panel-sub">Tap a row to load that member's assignment values.</div>
+      <table class="member-table" id="memberTable">
+        <thead><tr><th>Mem</th><th>L (km)</th><th>Type</th><th>PR (MW)</th><th>pf</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <h2>System parameters</h2>
+      <div class="panel-sub">Generalized — edit any field to model a different line.</div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Group number</label>
+          <input type="number" id="inGroup" value="8" min="1">
+        </div>
+        <div class="field">
+          <label>Frequency (Hz)</label>
+          <input type="number" id="inFreq" value="50">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Line length, L (km)</label>
+        <input type="number" id="inLength" value="80" step="1">
+        <div class="hint" id="lengthHint">K J 0 → member 4 of group 8</div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Resistance R (Ω/km)</label>
+          <input type="number" id="inR" value="0.1" step="0.01">
+        </div>
+        <div class="field">
+          <label>Reactance X (Ω/km)</label>
+          <input type="number" id="inX" value="1" step="0.01">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Shunt admittance Y (mho/km, susceptance)</label>
+        <input type="number" id="inY" value="0.0000028" step="0.0000001">
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Receiving-end power, PR (MW)</label>
+          <input type="number" id="inPR" value="40" step="0.1">
+        </div>
+        <div class="field">
+          <label>Receiving-end voltage, VR (kV, line-line)</label>
+          <input type="number" id="inVR" value="220" step="1">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Power factor (magnitude)</label>
+          <input type="number" id="inPF" value="0.6" step="0.01" min="0" max="1">
+        </div>
+        <div class="field">
+          <label>Power factor sense</label>
+          <div class="pf-toggle">
+            <button type="button" id="pfLag" class="active">Lagging</button>
+            <button type="button" id="pfLead">Leading</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="calc-btn" id="calcBtn">Calculate sending-end parameters</button>
+    </div>
+
+    <!-- RIGHT: results -->
+    <div class="panel">
+      <div class="results-top">
+        <h2 style="margin:0;">Sending-end results</h2>
+        <div class="schematic-note" id="modelNote"></div>
+      </div>
+      <div id="resultsBody">
+        <div class="empty-state">Pick a member or set parameters, then run the calculation.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>Built for the group-8 assignment · line model auto-selected from length (short &lt; 80 km · medium 80–250 km · long &gt; 250 km, per the exact distributed-parameter ABCD solution)</footer>
+</div>
+
+<script>
+/* ---------------- complex arithmetic ---------------- */
+const C = {
+  of:(re,im=0)=>({re,im}),
+  add:(a,b)=>({re:a.re+b.re, im:a.im+b.im}),
+  sub:(a,b)=>({re:a.re-b.re, im:a.im-b.im}),
+  mul:(a,b)=>({re:a.re*b.re-a.im*b.im, im:a.re*b.im+a.im*b.re}),
+  div:(a,b)=>{
+    const d=b.re*b.re+b.im*b.im;
+    return {re:(a.re*b.re+a.im*b.im)/d, im:(a.im*b.re-a.re*b.im)/d};
+  },
+  scale:(a,k)=>({re:a.re*k, im:a.im*k}),
+  abs:(a)=>Math.hypot(a.re,a.im),
+  angle:(a)=>Math.atan2(a.im,a.re),
+  conj:(a)=>({re:a.re, im:-a.im}),
+  sqrt:(a)=>{
+    const r=Math.hypot(a.re,a.im);
+    const re=Math.sqrt((r+a.re)/2);
+    let im=Math.sqrt((r-a.re)/2);
+    if(a.im<0) im=-im;
+    return {re,im};
+  },
+  cosh:(a)=>({re:Math.cosh(a.re)*Math.cos(a.im), im:Math.sinh(a.re)*Math.sin(a.im)}),
+  sinh:(a)=>({re:Math.sinh(a.re)*Math.cos(a.im), im:Math.cosh(a.re)*Math.sin(a.im)}),
+  fromPolar:(mag,ang)=>({re:mag*Math.cos(ang), im:mag*Math.sin(ang)})
+};
+
+/* ---------------- member table for group 8 ---------------- */
+function buildMembers(group){
+  const J = group % 10;
+  const rows = [];
+  for(let member=1; member<=6; member++){
+    const K = Math.abs(4-member);
+    const m = Math.abs(10-member);
+    const length = K*100 + J*10 + 0;
+    const pr = 5*group;
+    const pf = Number(('0.'+m));
+    rows.push({member, K, J, length, pr, pf});
+  }
+  return rows;
+}
+
+function classify(L){
+  if(L<80) return {type:'short', label:'SHORT LINE', range:'L < 80 km'};
+  if(L<=250) return {type:'medium', label:'MEDIUM LINE', range:'80 ≤ L ≤ 250 km'};
+  return {type:'long', label:'LONG LINE', range:'L > 250 km'};
+}
+
+/* ---------------- diagram rendering ---------------- */
+function renderDiagram(type){
+  const svg = document.getElementById('diagramSvg');
+  const wireY = 60;
+  let inner = '';
+
+  // source and load boxes (common to all)
+  inner += `<rect class="box" x="18" y="${wireY-22}" width="70" height="44" rx="3"></rect>
+    <text class="lbl-strong" x="53" y="${wireY-30}" text-anchor="middle">Sending</text>
+    <text x="53" y="${wireY+38}" text-anchor="middle">V_S, I_S</text>`;
+  inner += `<rect class="box" x="812" y="${wireY-22}" width="70" height="44" rx="3"></rect>
+    <text class="lbl-strong" x="847" y="${wireY-30}" text-anchor="middle">Receiving</text>
+    <text x="847" y="${wireY+38}" text-anchor="middle">V_R, I_R</text>`;
+
+  if(type==='short'){
+    inner += `<line class="wire" x1="88" y1="${wireY}" x2="812" y2="${wireY}"></line>
+      <rect x="330" y="${wireY-14}" width="240" height="28" fill="none" stroke="var(--copper)" stroke-width="2"></rect>
+      <text x="450" y="${wireY+5}" text-anchor="middle" class="mono" style="fill:var(--text)">Z = (R + jX)·L</text>
+      <text x="450" y="${wireY-24}" text-anchor="middle">series impedance only — shunt path open</text>`;
+  } else if(type==='medium'){
+    inner += `<line class="wire" x1="88" y1="${wireY}" x2="812" y2="${wireY}"></line>
+      <rect x="330" y="${wireY-14}" width="240" height="28" fill="none" stroke="var(--copper)" stroke-width="2"></rect>
+      <text x="450" y="${wireY+5}" text-anchor="middle" style="fill:var(--text)">Z (total series impedance)</text>
+      <text x="450" y="${wireY-24}" text-anchor="middle">nominal-π equivalent</text>
+      <line class="cap" x1="200" y1="${wireY}" x2="200" y2="${wireY+40}"></line>
+      <line class="cap" x1="188" y1="${wireY+40}" x2="212" y1="${wireY+40}" x2="212" y2="${wireY+40}"></line>
+      <line x1="188" y1="${wireY+40}" x2="212" y2="${wireY+40}" stroke="var(--amber)" stroke-width="2"></line>
+      <line x1="188" y1="${wireY+48}" x2="212" y2="${wireY+48}" stroke="var(--amber)" stroke-width="2"></line>
+      <line x1="200" y1="${wireY+48}" x2="200" y2="${wireY+58}" stroke="var(--amber)" stroke-width="2"></line>
+      <text x="200" y="${wireY+72}" text-anchor="middle">Y/2</text>
+      <line class="cap" x1="700" y1="${wireY}" x2="700" y2="${wireY+40}"></line>
+      <line x1="688" y1="${wireY+40}" x2="712" y2="${wireY+40}" stroke="var(--amber)" stroke-width="2"></line>
+      <line x1="688" y1="${wireY+48}" x2="712" y2="${wireY+48}" stroke="var(--amber)" stroke-width="2"></line>
+      <line x1="700" y1="${wireY+48}" x2="700" y2="${wireY+58}" stroke="var(--amber)" stroke-width="2"></line>
+      <text x="700" y="${wireY+72}" text-anchor="middle">Y/2</text>`;
+  } else {
+    inner += `<line class="wire-dim" x1="88" y1="${wireY}" x2="812" y2="${wireY}"></line>`;
+    for(let x=140; x<800; x+=95){
+      inner += `<circle class="node" cx="${x}" cy="${wireY}" r="3.5"></circle>`;
+    }
+    inner += `<text x="450" y="${wireY-24}" text-anchor="middle">distributed z, y per unit length — exact (hyperbolic) ABCD solution</text>
+      <text x="450" y="${wireY+38}" text-anchor="middle">γ = √(zy),  Z_c = √(z/y)</text>`;
+  }
+
+  svg.innerHTML = inner;
+}
+
+/* ---------------- state / DOM ---------------- */
+const el = id=>document.getElementById(id);
+let pfLagging = true;
+
+function fillFromMember(row, group){
+  el('inGroup').value = group;
+  el('inLength').value = row.length;
+  el('inPR').value = row.pr;
+  el('inPF').value = row.pf;
+  el('inVR').value = 220;
+  el('inR').value = 0.1;
+  el('inX').value = 1;
+  el('inY').value = 0.0000028;
+  el('lengthHint').textContent = `K=${row.K}, J=${row.J} → length ${row.K}${row.J}0 km (member ${row.member} of group ${group})`;
+  highlightMember(row.member);
+  updateSchematic();
+}
+
+function highlightMember(member){
+  document.querySelectorAll('#memberTable tbody tr').forEach(tr=>{
+    tr.classList.toggle('active', Number(tr.dataset.member)===member);
+  });
+}
+
+function renderMemberTable(){
+  const group = Number(el('inGroup').value)||8;
+  el('tagGroup').textContent = group;
+  const rows = buildMembers(group);
+  const tbody = document.querySelector('#memberTable tbody');
+  tbody.innerHTML = '';
+  rows.forEach(r=>{
+    const cls = classify(r.length);
+    const tr = document.createElement('tr');
+    tr.dataset.member = r.member;
+    tr.innerHTML = `<td>${r.member}</td><td>${r.length}</td><td>${cls.type}</td><td>${r.pr}</td><td>${r.pf.toFixed(1)}</td>`;
+    tr.addEventListener('click', ()=>fillFromMember(r, group));
+    tbody.appendChild(tr);
+  });
+}
+
+function updateSchematic(){
+  const L = Number(el('inLength').value)||0;
+  const cls = classify(L);
+  const dot = el('badgeDot');
+  const colors = {short:'var(--good)', medium:'var(--warn)', long:'var(--bad)'};
+  dot.style.background = colors[cls.type];
+  el('badgeText').textContent = `${cls.label} · ${cls.range}`;
+  const notes = {
+    short:'shunt admittance neglected — series impedance only',
+    medium:'nominal-π model — half the shunt admittance lumped at each end',
+    long:'exact distributed-parameter model — solved with hyperbolic ABCD constants'
+  };
+  el('schematicNote').textContent = notes[cls.type];
+  renderDiagram(cls.type);
+  return cls;
+}
+
+el('pfLag').addEventListener('click', ()=>{pfLagging=true; el('pfLag').classList.add('active'); el('pfLead').classList.remove('active');});
+el('pfLead').addEventListener('click', ()=>{pfLagging=false; el('pfLead').classList.add('active'); el('pfLag').classList.remove('active');});
+
+el('inGroup').addEventListener('input', renderMemberTable);
+el('inLength').addEventListener('input', updateSchematic);
+
+/* ---------------- calculation ---------------- */
+function calculate(){
+  const L = Number(el('inLength').value);
+  const R = Number(el('inR').value);
+  const X = Number(el('inX').value);
+  const Y = Number(el('inY').value);
+  const PR = Number(el('inPR').value);
+  const VR_ll = Number(el('inVR').value);
+  const pf = Number(el('inPF').value);
+
+  const cls = updateSchematic();
+
+  const zPerKm = C.of(R, X);
+  const yPerKm = C.of(0, Y);
+  const Ztot = C.scale(zPerKm, L);
+  const Ytot = C.scale(yPerKm, L);
+
+  let A,B,Dm,Cc;
+  if(cls.type==='short'){
+    A = C.of(1,0); Dm = C.of(1,0); B = Ztot; Cc = C.of(0,0);
+  } else if(cls.type==='medium'){
+    const ZY = C.mul(Ztot, Ytot);
+    A = C.add(C.of(1,0), C.scale(ZY,0.5));
+    Dm = A;
+    B = Ztot;
+    Cc = C.mul(Ytot, C.add(C.of(1,0), C.scale(ZY,0.25)));
+  } else {
+    const gamma = C.sqrt(C.mul(zPerKm, yPerKm));
+    const Zc = C.sqrt(C.div(zPerKm, yPerKm));
+    const theta = C.scale(gamma, L);
+    A = C.cosh(theta); Dm = A;
+    B = C.mul(Zc, C.sinh(theta));
+    Cc = C.div(C.sinh(theta), Zc);
+  }
+
+  // receiving end phasors (per-phase, VR as reference at angle 0)
+  const VRphase = C.of((VR_ll*1000)/Math.sqrt(3), 0);
+  const IRmag = (PR*1e6)/(Math.sqrt(3)*VR_ll*1000*pf);
+  const phi = Math.acos(pf);
+  const IR = C.fromPolar(IRmag, pfLagging ? -phi : phi);
+
+  const VSphase = C.add(C.mul(A,VRphase), C.mul(B,IR));
+  const IS = C.add(C.mul(Cc,VRphase), C.mul(Dm,IR));
+
+  const VS_ll = C.abs(VSphase)*Math.sqrt(3)/1000; // kV
+  const IS_mag = C.abs(IS); // A
+
+  const Sphase = C.mul(VSphase, C.conj(IS));
+  const S3 = C.scale(Sphase, 3);
+  const Ps = S3.re/1e6;      // MW
+  const Qs = S3.im/1e6;      // MVAR
+  const Ss = C.abs(S3)/1e6;  // MVA
+  const pfS = Ps/Ss;
+  const sendLagging = Qs>=0;
+
+  const VR_noload = C.abs(C.div(VSphase, A));
+  const regulation = ((VR_noload - C.abs(VRphase))/C.abs(VRphase))*100;
+  const efficiency = (PR/Ps)*100;
+
+  renderResults({A,B,C:Cc,D:Dm}, {
+    IRmag, VS_ll, IS_mag, Ps, Qs, Ss, pfS, sendLagging, regulation, efficiency, cls
+  });
+}
+
+function fmtC(z){
+  const sign = z.im>=0 ? '+' : '−';
+  return `${z.re.toFixed(4)} ${sign} j${Math.abs(z.im).toFixed(4)}`;
+}
+function fmtMag(z){
+  return `∠${(C.angle(z)*180/Math.PI).toFixed(2)}°`;
+}
+
+function renderResults(abcd, r){
+  el('modelNote').textContent = `${r.cls.label.toLowerCase()} model`;
+  const body = el('resultsBody');
+  body.innerHTML = `
+    <div class="abcd-grid">
+      <div class="abcd-cell"><div class="k">A (per unit)</div><div class="v">${fmtC(abcd.A)}</div></div>
+      <div class="abcd-cell"><div class="k">B (Ω)</div><div class="v">${fmtC(abcd.B)}</div></div>
+      <div class="abcd-cell"><div class="k">C (mho)</div><div class="v">${(abcd.C.re).toExponential(3)}${abcd.C.im>=0?'+':'−'}j${Math.abs(abcd.C.im).toExponential(3)}</div></div>
+      <div class="abcd-cell"><div class="k">D (per unit)</div><div class="v">${fmtC(abcd.D)}</div></div>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout"><div class="lbl">Receiving current, I_R</div><div class="val">${r.IRmag.toFixed(2)}<span class="unit">A</span></div></div>
+      <div class="readout accent"><div class="lbl">Sending voltage, V_S (line-line)</div><div class="val">${r.VS_ll.toFixed(3)}<span class="unit">kV</span></div></div>
+      <div class="readout accent"><div class="lbl">Sending current, I_S</div><div class="val">${r.IS_mag.toFixed(2)}<span class="unit">A</span></div></div>
+      <div class="readout"><div class="lbl">Sending active power, P_S</div><div class="val">${r.Ps.toFixed(3)}<span class="unit">MW</span></div></div>
+      <div class="readout"><div class="lbl">Sending reactive power, Q_S</div><div class="val">${r.Qs.toFixed(3)}<span class="unit">MVAR</span></div></div>
+      <div class="readout"><div class="lbl">Sending apparent power, S_S</div><div class="val">${r.Ss.toFixed(3)}<span class="unit">MVA</span></div></div>
+    </div>
+
+    <div class="bar-row">
+      <div class="bar-top"><span>Sending-end power factor (${r.sendLagging?'lagging':'leading'})</span><span class="num">${r.pfS.toFixed(4)}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(r.pfS*100,100)}%"></div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-top"><span>Voltage regulation</span><span class="num">${r.regulation.toFixed(3)} %</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(Math.abs(r.regulation),100)}%"></div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-top"><span>Transmission efficiency</span><span class="num">${r.efficiency.toFixed(3)} %</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(r.efficiency,100)}%"></div></div>
+    </div>
+
+    <div class="formula-note">
+      V_S = A·V_R + B·I_R &nbsp;·&nbsp; I_S = C·V_R + D·I_R &nbsp;·&nbsp;
+      Regulation = (|V_S/A| − |V_R|) / |V_R| × 100 &nbsp;·&nbsp; Efficiency = P_R / P_S × 100
+    </div>
+  `;
+}
+
+el('calcBtn').addEventListener('click', calculate);
+
+/* ---------------- init ---------------- */
+renderMemberTable();
+fillFromMember(buildMembers(8)[3], 8); // default: member 4, group 8 (boundary medium/short case)
+calculate();
+</script>
+</body>
+</html>
