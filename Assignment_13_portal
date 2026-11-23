@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stepped Distance Protection Portal</title>
+<style>
+:root{--bg:#fff;--fg:#1b1f24;--mut:#5b6670;--card:#f4f6f9;--bd:#d3d9e0;--z1:#d62728;--z2:#e8710a;--z3:#1f77b4;--acc:#4f46e5;--ok:#1a7f37;--bad:#c62828;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111418;--fg:#e8ecf0;--mut:#9aa5b1;--card:#1b2027;--bd:#323a44;--z1:#ff6b6b;--z2:#ffa94d;--z3:#5aa9e6;--acc:#8b87ff;--ok:#56d364;--bad:#ff7b72;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111418;--fg:#e8ecf0;--mut:#9aa5b1;--card:#1b2027;--bd:#323a44;--z1:#ff6b6b;--z2:#ffa94d;--z3:#5aa9e6;--acc:#8b87ff;--ok:#56d364;--bad:#ff7b72;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:0 0 2px}h2{font-size:1.05rem;margin:0 0 8px}
+.sub{color:var(--mut);margin:0 0 14px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(310px,1fr))}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;min-width:0}
+label{display:block;font-size:.85rem;color:var(--mut);margin:10px 0 3px}
+select,input[type=range],button{width:100%;font:inherit}
+select{padding:7px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg)}
+button{padding:10px;border:0;border-radius:8px;background:var(--acc);color:#fff;font-weight:600;margin-top:14px;cursor:pointer}
+button.alt{background:transparent;color:var(--acc);border:1px solid var(--acc);margin-top:8px}
+.val{float:right;color:var(--fg);font-weight:600}
+canvas{width:100%;display:block}
+.res{font-size:1.05rem}.res b{color:var(--acc)}
+.pass{color:var(--ok);font-weight:600}.fail{color:var(--bad);font-weight:600}
+.tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{border-bottom:1px solid var(--bd);padding:4px 8px;text-align:center;white-space:nowrap}th{color:var(--mut);font-weight:600}
+.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--mut);margin-top:6px}
+.lg i{display:inline-block;width:12px;height:3px;margin-right:5px;vertical-align:middle}
+.wide{grid-column:1/-1}
+</style></head><body><main>
+<h1>⚡ Stepped Distance Protection Portal</h1>
+<p class="sub">Assignment 13 · Mahi Naval (240002040) · 220 kV, 50 Hz · 3-zone mho relay at bus A · line AB 100 km, line BC 80 km</p>
+<div class="grid">
+ <div class="card"><h2>Fault scenario</h2>
+  <label>Fault type</label><select id="ft"></select>
+  <label>Distance from relay A <span class="val" id="dv"></span></label><input type="range" id="d" min="1" max="230" value="50">
+  <label>Fault resistance <span class="val" id="rv"></span></label><input type="range" id="rf" min="0" max="50" step="0.5" value="0">
+  <button id="run">Run simulation</button><button class="alt" id="all">Run all 25 verification tests</button>
+  <p class="sub" style="margin-top:12px;font-size:.82rem">Bus B at 100 km, bus C at 180 km. Zone reach: Z1 80 km, Z2 120 km, Z3 196 km. Time-domain run: 1600 Hz samples, 3rd harmonic and noise, one-cycle DFT, fault at 0.1 s.</p></div>
+ <div class="card"><h2>Relay response</h2><div class="res" id="res">Press “Run simulation”.</div>
+  <div class="tbl" style="margin-top:10px"><table id="set"><tr><th>Zone</th><th>Reach (Ω pri)</th><th>Reach (Ω sec)</th><th>Length</th><th>Delay</th></tr></table></div></div>
+ <div class="card"><h2>R–X plane</h2><canvas id="rx" height="360"></canvas>
+  <div class="lg"><span><i style="background:var(--z1)"></i>Zone 1</span><span><i style="background:var(--z2)"></i>Zone 2</span><span><i style="background:var(--z3)"></i>Zone 3</span><span><i style="background:var(--acc)"></i>measured Z (DFT)</span></div></div>
+ <div class="card"><h2>Relay currents at inception (kA)</h2><canvas id="wv" height="170"></canvas>
+  <h2 style="margin-top:10px">Zone pickup and trip timeline</h2><canvas id="tl" height="130"></canvas></div>
+ <div class="card wide"><h2>Stepped time–distance characteristic</h2><canvas id="st" height="190"></canvas></div>
+ <div class="card wide"><h2>Verification campaign (solid faults, phasor model)</h2><div id="sum" class="res"></div><div class="tbl"><table id="tt"></table></div></div>
+</div></main>
+<script>
+const $=id=>document.getElementById(id);
+const C={add:(x,y)=>[x[0]+y[0],x[1]+y[1]],sub:(x,y)=>[x[0]-y[0],x[1]-y[1]],mul:(x,y)=>[x[0]*y[0]-x[1]*y[1],x[0]*y[1]+x[1]*y[0]],
+div:(x,y)=>{const m=y[0]*y[0]+y[1]*y[1];return[(x[0]*y[0]+x[1]*y[1])/m,(x[1]*y[0]-x[0]*y[1])/m]},sc:(x,k)=>[x[0]*k,x[1]*k],abs:x=>Math.hypot(x[0],x[1]),arg:x=>Math.atan2(x[1],x[0]),ex:t=>[Math.cos(t),Math.sin(t)]};
+const E=220e3/Math.sqrt(3),W=2*Math.PI*50,a=C.ex(2*Math.PI/3),a2=C.mul(a,a),Z1L=[.08,.4],Z0L=[.3,1.2],Zs1=[.5,10],Zs0=[1,15];
+const K0=C.div(C.sub(Z0L,Z1L),Z1L),TH=C.arg(Z1L),zl=C.abs(Z1L),ZAB=zl*100,ZBC=zl*80;
+const R=[0,.8*ZAB,1.2*ZAB,ZAB+1.2*ZBC],DLY=[0,0,.4,.8],ISTART=500,PERS=8;
+const FT={AG:['G',0],BG:['G',1],CG:['G',2],AB:['LL',2],BC:['LL',0],CA:['LL',1],ABG:['LLG',2],BCG:['LLG',0],CAG:['LLG',1],ABC:['3P',0],NONE:['N',0]};
+const NAMES={AG:'A–G',BG:'B–G',CG:'C–G',AB:'A–B',BC:'B–C',CA:'C–A',ABG:'A–B–G',BCG:'B–C–G',CAG:'C–A–G',ABC:'A–B–C (3-phase)',NONE:'No fault (load only)'};
+const seq=(x0,x1,x2)=>[C.add(C.add(x0,x1),x2),C.add(C.add(x0,C.mul(a2,x1)),C.mul(a,x2)),C.add(C.add(x0,C.mul(a,x1)),C.mul(a2,x2))];
+function prefault(){const p=[[1,0],a2,a];return[p.map(x=>C.sc(x,.99*E)),p.map(x=>C.mul(C.sc(C.ex(-20*Math.PI/180),300),x))]}
+function faultPhasors(ft,d,Rf){const[k,s]=FT[ft];if(k=='N')return prefault();
+ const Z1t=C.add(Zs1,C.sc(Z1L,d)),Z0t=C.add(Zs0,C.sc(Z0L,d)),E1=[E,0];let I1,I2,I0;
+ if(k=='G'){I1=C.div(E1,C.add(C.add(C.sc(Z1t,2),Z0t),[3*Rf,0]));I2=I0=I1}
+ else if(k=='LL'){I1=C.div(E1,C.add(C.sc(Z1t,2),[Rf,0]));I2=C.sc(I1,-1);I0=[0,0]}
+ else if(k=='LLG'){const Zg=C.add(Z0t,[3*Rf,0]),S=C.add(Z1t,Zg),par=C.div(C.mul(Z1t,Zg),S);I1=C.div(E1,C.add(Z1t,par));I2=C.sc(C.mul(I1,C.div(Zg,S)),-1);I0=C.sc(C.mul(I1,C.div(Z1t,S)),-1)}
+ else{I1=C.div(E1,C.add(Z1t,[Rf,0]));I2=I0=[0,0]}
+ const V1=C.sub(E1,C.mul(Zs1,I1)),V2=C.sc(C.mul(Zs1,I2),-1),V0=C.sc(C.mul(Zs0,I0),-1);
+ const Vr=seq(V0,V1,V2),Ir=seq(I0,I1,I2),f=s==0?[1,0]:s==1?a2:a,V=[],I=[];
+ for(let q=0;q<3;q++){V[(q+s)%3]=C.mul(f,Vr[q]);I[(q+s)%3]=C.mul(f,Ir[q])}return[V,I]}
+function inMho(Z,z){const Zr=C.sc(C.ex(TH),R[z]);return C.abs(C.sub(Z,C.sc(Zr,.5)))<=R[z]/2}
+function relayZone(V,I){const Im=Math.max(...I.map(C.abs));if(Im<ISTART)return{zone:0,Z:null,loop:'-'};
+ const I0=C.sc(I.reduce(C.add),1/3),gnd=3*C.abs(I0)>.1*Im,e=1e-9,L=[];
+ const ph=(x,y,n)=>L.push([n,C.div(C.sub(V[x],V[y]),C.add(C.sub(I[x],I[y]),[e,0]))]);ph(0,1,'AB');ph(1,2,'BC');ph(2,0,'CA');
+ if(gnd)['AG','BG','CG'].forEach((n,q)=>L.push([n,C.div(V[q],C.add(C.add(I[q],C.mul(K0,I0)),[e,0]))]));
+ L.sort((p,q)=>C.abs(p[1])-C.abs(q[1]));const Z=L[0][1];let zone=0;
+ for(let z=1;z<=3;z++)if(inMho(Z,z)){zone=z;break}return{zone,Z,loop:L[0][0]}}
+const expZone=d=>{for(let z=1;z<=3;z++)if(d*zl<=R[z]+1e-9)return z;return 0};
+// ---------- time-domain simulation ----------
+let seed=7;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+const gauss=()=>Math.sqrt(-2*Math.log(rnd()+1e-12))*Math.cos(2*Math.PI*rnd());
+function simulate(ft,d,Rf){const fs=1600,T=1.3,tf=.1,n=Math.round(T*fs),N=32;seed=7;
+ const[Vp,Ip]=prefault(),[Vf,If]=faultPhasors(ft,d,Rf);const v=[[],[],[]],c=[[],[],[]];
+ for(let q=0;q<3;q++)for(let k=0;k<n;k++){const t=k/fs,on=t>=tf,vv=on?Vf[q]:Vp[q],ii=on?If[q]:Ip[q];
+  v[q].push(Math.SQRT2*C.abs(vv)*Math.cos(W*t+C.arg(vv))+.03*Math.SQRT2*C.abs(vv)*Math.cos(3*W*t+.5)+.002*Math.SQRT2*E*gauss());
+  c[q].push(Math.SQRT2*C.abs(ii)*Math.cos(W*t+C.arg(ii))+.03*Math.SQRT2*C.abs(ii)*Math.cos(3*W*t+.5)+.002*Math.SQRT2*1000*gauss())}
+ const ker=[];for(let k=0;k<N;k++)ker.push(C.sc(C.ex(2*Math.PI*k/N),2/N/Math.SQRT2));
+ const dft=(x,s)=>{let r=[0,0];for(let k=0;k<N;k++)r=C.add(r,C.sc(ker[k],x[s-k]));return r};
+ const zone=new Array(n).fill(0),Zs=[],cnt=[0,0,0];let trip=null;
+ for(let s=N-1;s<n&&!trip;s++){const r=relayZone([0,1,2].map(q=>dft(v[q],s)),[0,1,2].map(q=>dft(c[q],s)));zone[s]=r.zone;if(r.Z&&r.zone>0||r.Z&&s>=160)Zs.push({t:s/fs,Z:r.Z});
+  for(let z=1;z<=3;z++)cnt[z-1]=(r.zone>0&&r.zone<=z)?cnt[z-1]+1:0;
+  for(let z=1;z<=3;z++)if(cnt[z-1]/fs>=Math.max(DLY[z],PERS/fs)-1e-12){trip={z,t:s/fs,loop:r.loop};break}}
+ return{fs,tf,n,c,zone,Zs,trip}}
+// ---------- drawing ----------
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function prep(cv){const r=cv.getBoundingClientRect(),dp=window.devicePixelRatio||1;cv.width=r.width*dp;cv.height=r.height*dp;const g=cv.getContext('2d');g.setTransform(dp,0,0,dp,0,0);g.clearRect(0,0,r.width,r.height);return[g,r.width,r.height]}
+function axes(g,w,h,xr,yr,P,xl,yl,xt=5,yt=5){const X=x=>P.l+(x-xr[0])/(xr[1]-xr[0])*(w-P.l-P.r),Y=y=>h-P.b-(y-yr[0])/(yr[1]-yr[0])*(h-P.t-P.b);
+ g.strokeStyle=css('--bd');g.fillStyle=css('--mut');g.font='11px system-ui';g.lineWidth=1;g.textAlign='center';
+ for(let i=0;i<=xt;i++){const x=xr[0]+(xr[1]-xr[0])*i/xt;g.beginPath();g.moveTo(X(x),P.t);g.lineTo(X(x),h-P.b);g.stroke();g.fillText(+x.toFixed(2),X(x),h-P.b+13)}
+ g.textAlign='right';for(let i=0;i<=yt;i++){const y=yr[0]+(yr[1]-yr[0])*i/yt;g.beginPath();g.moveTo(P.l,Y(y));g.lineTo(w-P.r,Y(y));g.stroke();g.fillText(+y.toFixed(2),P.l-4,Y(y)+4)}
+ g.textAlign='center';g.fillText(xl,(P.l+w-P.r)/2,h-3);g.save();g.translate(11,(P.t+h-P.b)/2);g.rotate(-Math.PI/2);g.fillText(yl,0,0);g.restore();return[X,Y]}
+function path(g,pts,X,Y,col,lw=1.5,step=false){g.strokeStyle=col;g.lineWidth=lw;g.beginPath();pts.forEach(([x,y],i)=>{if(i==0)g.moveTo(X(x),Y(y));else{if(step)g.lineTo(X(x),Y(pts[i-1][1]));g.lineTo(X(x),Y(y))}});g.stroke()}
+const zc=()=>[css('--mut'),css('--z1'),css('--z2'),css('--z3')];
+function drawRX(res,steady){const cv=$('rx'),[g,w,h]=prep(cv),P={l:38,r:8,t:8,b:30},xr=[-10,70],yr=[-10,100];
+ const sc=Math.min((w-P.l-P.r)/80,(h-P.t-P.b)/110),ww=80*sc+P.l+P.r,hh=110*sc+P.t+P.b;
+ const [X,Y]=axes(g,ww,hh,xr,yr,P,'R (Ω)','X (Ω)',8,11);
+ for(let z=1;z<=3;z++){const Zr=C.sc(C.ex(TH),R[z]),ce=C.sc(Zr,.5),pts=[];for(let k=0;k<=180;k++){const p=C.add(ce,C.sc(C.ex(k/180*2*Math.PI),R[z]/2));pts.push([p[0],p[1]])}
+  path(g,pts,X,Y,zc()[z],2)}
+ path(g,[[0,0],[200*Z1L[0],200*Z1L[1]]],X,Y,css('--mut'),1);
+ if(res)res.Zs.forEach(p=>{if(p.Z[0]>xr[0]&&p.Z[0]<xr[1]&&p.Z[1]>yr[0]&&p.Z[1]<yr[1]){g.fillStyle=css('--acc');g.globalAlpha=.35;g.beginPath();g.arc(X(p.Z[0]),Y(p.Z[1]),2.2,0,7);g.fill();g.globalAlpha=1}});
+ if(steady){g.fillStyle=zc()[steady.zone];g.strokeStyle=css('--fg');g.lineWidth=1.5;g.beginPath();g.arc(X(steady.Z[0]),Y(steady.Z[1]),6,0,7);g.fill();g.stroke()}}
+function drawWave(res){const[g,w,h]=prep($('wv')),P={l:44,r:8,t:8,b:28},t0=res.tf-.04,t1=res.tf+.08;let m=0;
+ res.c.forEach(a=>a.forEach(x=>m=Math.max(m,Math.abs(x))));m=Math.ceil(m/1e3*1.1*2)/2||1;
+ const[X,Y]=axes(g,w,h,[t0,t1],[-m,m],P,'time (s)','kA',6,4);const cols=['#d62728','#2ca02c','#1f77b4'];
+ res.c.forEach((a,q)=>{const pts=[];for(let k=Math.floor(t0*res.fs);k<=Math.min(res.n-1,Math.ceil(t1*res.fs));k++)pts.push([k/res.fs,a[k]/1e3]);path(g,pts,X,Y,cols[q],1.3)});
+ g.setLineDash([4,3]);path(g,[[res.tf,-m],[res.tf,m]],X,Y,css('--fg'),1);g.setLineDash([])}
+function drawTL(res){const[g,w,h]=prep($('tl')),P={l:44,r:8,t:8,b:28},[X,Y]=axes(g,w,h,[0,1.3],[0,3.4],P,'time (s)','zone',13,3);
+ const pts=[];for(let k=0;k<res.n;k+=2)pts.push([k/res.fs,res.zone[k]]);path(g,pts,X,Y,css('--acc'),1.6,true);
+ g.setLineDash([4,3]);path(g,[[res.tf,0],[res.tf,3.4]],X,Y,css('--fg'),1);g.setLineDash([]);
+ if(res.trip){path(g,[[res.trip.t,0],[res.trip.t,3.4]],X,Y,css('--bad'),2);g.fillStyle=css('--bad');g.textAlign='left';g.fillText('TRIP Z'+res.trip.z,X(res.trip.t)+4,Y(3.1))}}
+let stCache=null;
+function drawST(d){const[g,w,h]=prep($('st')),P={l:44,r:10,t:10,b:30};if(!stCache){stCache=[];for(let x=1;x<=240;x++){const[V,I]=faultPhasors('ABC',x,0),r=relayZone(V,I);stCache.push([x,r.zone?DLY[r.zone]:NaN])}}
+ const[X,Y]=axes(g,w,h,[0,240],[0,1],P,'fault distance from relay A (km)','operating time (s)',12,5);
+ let seg=[];const flush=()=>{if(seg.length)path(g,seg,X,Y,css('--acc'),2.2,true);seg=[]};stCache.forEach(p=>{if(isNaN(p[1]))flush();else seg.push(p)});flush();
+ [[100,'Bus B'],[180,'Bus C']].forEach(([k,l])=>{g.setLineDash([3,3]);path(g,[[k,0],[k,1]],X,Y,css('--mut'),1);g.setLineDash([]);g.fillStyle=css('--mut');g.textAlign='left';g.fillText(l,X(k)+3,Y(.96))});
+ [1,2,3].forEach(z=>{g.setLineDash([5,3]);path(g,[[R[z]/zl,0],[R[z]/zl,1]],X,Y,zc()[z],1.2);g.setLineDash([]);g.fillStyle=zc()[z];g.textAlign='left';g.fillText('Z'+z+' '+(R[z]/zl).toFixed(0)+' km',X(R[z]/zl)+3,Y(.06+.08*z))});
+ path(g,[[d,0],[d,1]],X,Y,css('--bad'),2)}
+// ---------- UI ----------
+Object.keys(FT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=NAMES[k];$('ft').appendChild(o)});
+const SEC=.5;[1,2,3].forEach(z=>{$('set').insertAdjacentHTML('beforeend',`<tr><td>Z${z}</td><td>${R[z].toFixed(2)}</td><td>${(R[z]*SEC).toFixed(2)}</td><td>${(R[z]/zl).toFixed(0)} km</td><td>${DLY[z]} s</td></tr>`)});
+function run(){const ft=$('ft').value,d=+$('d').value,rf=+$('rf').value;$('dv').textContent=d+' km';$('rv').textContent=rf+' Ω';
+ const[V,I]=faultPhasors(ft,d,rf),steady=relayZone(V,I),res=simulate(ft,d,rf),exp=ft=='NONE'?0:steady.zone;
+ let h=`<div>Fault: <b>${NAMES[ft]}</b> at ${d} km (${d<=100?'line AB':d<=180?'line BC':'beyond bus C'}), R<sub>f</sub> = ${rf} Ω</div>`;
+ if(steady.Z)h+=`<div>Settled loop impedance: ${steady.Z[0].toFixed(2)} ${steady.Z[1]<0?'−':'+'} j${Math.abs(steady.Z[1]).toFixed(2)} Ω (|Z| = ${C.abs(steady.Z).toFixed(2)} Ω, ${steady.loop} loop)</div>`;
+ h+=res.trip?`<div style="margin-top:6px">Relay: <b>TRIP in Zone ${res.trip.z}</b> (${res.trip.loop} loop) at <b>${(res.trip.t-res.tf).toFixed(3)} s</b> after inception</div>`:`<div style="margin-top:6px">Relay: <b>no trip</b> (${ft=='NONE'?'normal load':'fault outside Zone 3 reach or too weak to start the relay'})</div>`;
+ h+=`<div class="${(res.trip?res.trip.z:0)==exp?'pass':'fail'}">Expected from settings: ${exp?'Zone '+exp:'no trip'} → ${(res.trip?res.trip.z:0)==exp?'matches':'differs (fault resistance or boundary effect)'}</div>`;
+ $('res').innerHTML=h;drawRX(res,steady.Z?steady:null);drawWave(res);drawTL(res);drawST(ft=='NONE'?-10:d)}
+function campaign(){const L=[['AG',20],['BG',60],['CG',78],['AB',40],['BC',70],['CA',55],['ABG',75],['BCG',30],['CAG',15],['ABC',10],['ABC',79],['AG',85],['AB',95],['ABC',100],['BC',110],['CAG',115],['BG',118],['AG',125],['CA',140],['ABC',160],['BCG',175],['CG',178],['AB',205],['ABC',230],['NONE',0]];
+ let ok=0,h='<tr><th>Fault</th><th>d (km)</th><th>Location</th><th>Loop</th><th>|Z| (Ω)</th><th>Zone</th><th>Expected</th><th>Status</th></tr>';
+ L.forEach(([ft,d])=>{const[V,I]=faultPhasors(ft,d,0),r=relayZone(V,I),ex=ft=='NONE'?0:expZone(d),p=r.zone==ex;if(p)ok++;
+  h+=`<tr><td>${ft}</td><td>${d||'–'}</td><td>${ft=='NONE'?'load':d<=100?'AB':d<=180?'BC':'beyond C'}</td><td>${r.loop}</td><td>${r.Z?C.abs(r.Z).toFixed(2):'–'}</td><td>${r.zone?'Z'+r.zone:'none'}</td><td>${ex?'Z'+ex:'none'}</td><td class="${p?'pass':'fail'}">${p?'PASS':'FAIL'}</td></tr>`});
+ $('tt').innerHTML=h;$('sum').innerHTML=`<span class="${ok==L.length?'pass':'fail'}">${ok} / ${L.length} cases classified correctly</span>`}
+$('run').onclick=run;$('all').onclick=()=>{campaign();$('tt').scrollIntoView({behavior:'smooth'})};
+$('d').oninput=()=>{$('dv').textContent=$('d').value+' km'};$('rf').oninput=()=>{$('rv').textContent=$('rf').value+' Ω'};
+$('ft').onchange=run;$('d').onchange=run;$('rf').onchange=run;
+addEventListener('resize',run);matchMedia('(prefers-color-scheme:dark)').onchange=run;
+campaign();run();
+</script></body></html>
